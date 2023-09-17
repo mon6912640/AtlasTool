@@ -26,6 +26,15 @@ def run(p_source, p_out):
     pass
 
 
+def find_frames(p_obj_json):
+    if 'mc' in p_obj_json:
+        for k in p_obj_json['mc']:
+            child = p_obj_json['mc'][k]
+            if 'frames' in child:
+                return child['frames']
+    return None
+
+
 def split_egret(p_json, p_png, p_out):
     # 打开png文件
     img_big = Image.open(p_png)
@@ -40,7 +49,11 @@ def split_egret(p_json, p_png, p_out):
     # print(obj_json['mc'])
     # print(obj_json['res'])
     res_dict = obj_json['res']
-    frames = obj_json['mc']['mc']['frames']
+    # 遍历找到”frames“字段
+    frames = find_frames(obj_json)
+    if frames is None:
+        sys.exit(f'[ERROR]没有找到frames字段')
+
     vo_dict = {}
     frame_index = 0
 
@@ -104,7 +117,7 @@ def split_egret(p_json, p_png, p_out):
     print(f'[INFO]最大高度：{max_h}')
     print(f'[INFO]最小裁剪左边距：{min_cut_left}')
     print(f'[INFO]最小裁剪上边距：{min_cut_top}')
-    
+
     for vo in vo_dict.values():
         single_png = img_big.crop((vo.x, vo.y, vo.x + vo.w, vo.y + vo.h))
 
@@ -116,7 +129,10 @@ def split_egret(p_json, p_png, p_out):
         # 裁剪
         new_img = new_img.crop((min_cut_left, min_cut_top, max_w, max_h))
 
-        out_path = Path(p_out).joinpath(out_name).joinpath(vo.name)
+        png_name = vo.name
+        if png_name.endswith('.png'):
+            png_name = png_name[:-4]
+        out_path = Path(p_out).joinpath(out_name).joinpath(png_name + '.png')
         out_path.parent.mkdir(parents=True, exist_ok=True)
         new_img.save(out_path)
 
@@ -129,8 +145,8 @@ if __name__ == '__main__':
 
     app = sys.argv[0]
 
-    json_url = 'testres/role_10008.json'
-    png_url = 'testres/role_10008.png'
+    json_url = 'testres/body_101_run_ani.json'
+    png_url = 'testres/body_101_run_ani.png'
     out_url = 'testout'
 
     split_egret(json_url, png_url, out_url)
