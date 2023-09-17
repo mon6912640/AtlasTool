@@ -145,8 +145,8 @@ if __name__ == '__main__':
 
     app = sys.argv[0]
 
-    json_url = 'testres/body_101_run_ani.json'
-    png_url = 'testres/body_101_run_ani.png'
+    json_url = 'testres/qz_10002.json'
+    png_url = 'testres/qz_10002.png'
     out_url = 'testout'
 
     split_egret(json_url, png_url, out_url)
