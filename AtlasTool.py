@@ -35,7 +35,15 @@ def find_frames(p_obj_json):
     return None
 
 
-def split_egret(p_json, p_png, p_out):
+def split_egret(p_json, p_png, p_out, p_offset_type=0):
+    """
+    拆分egret图集
+    :param p_json: json路径
+    :param p_png: png路径
+    :param p_out: 输出路径
+    :param p_offset_type: 偏移值类型 0:左上角 1:中心点
+    :return:
+    """
     # 打开png文件
     img_big = Image.open(p_png)
 
@@ -57,12 +65,6 @@ def split_egret(p_json, p_png, p_out):
     vo_dict = {}
     frame_index = 0
 
-    max_w = 0  # 记录最大宽度
-    max_h = 0  # 记录最大高度
-
-    min_cut_left = 0  # 记录最小裁剪左边距
-    min_cut_top = 0  # 记录最小裁剪上边距
-
     for data in frames:
         frame_index += 1
         vo = VoFrame()
@@ -78,6 +80,30 @@ def split_egret(p_json, p_png, p_out):
 
         vo_dict[vo.name] = vo
 
+    if p_offset_type == 0:
+        handle_lett_top(vo_dict, img_big, p_out, out_name)
+    elif p_offset_type == 1:
+        handle_center(vo_dict, img_big, p_out, out_name)
+
+
+def handle_lett_top(p_vo_dict: dict, p_img_big: Image, p_out, p_out_name):
+    """
+    处理偏移类型为左上角的类型
+    :param p_vo_dict:
+    :param p_img_big:
+    :param p_out:
+    :param p_out_name:
+    :return:
+    """
+    max_w = 0  # 记录最大宽度
+    max_h = 0  # 记录最大高度
+
+    min_cut_left = 0  # 记录最小裁剪左边距
+    min_cut_top = 0  # 记录最小裁剪上边距
+
+    vo_list = p_vo_dict.values()
+    print(vo_list)
+    for vo in vo_list:
         # 计算新图像的宽高
         new_w = 0
         new_h = 0
@@ -118,8 +144,8 @@ def split_egret(p_json, p_png, p_out):
     print(f'[INFO]最小裁剪左边距：{min_cut_left}')
     print(f'[INFO]最小裁剪上边距：{min_cut_top}')
 
-    for vo in vo_dict.values():
-        single_png = img_big.crop((vo.x, vo.y, vo.x + vo.w, vo.y + vo.h))
+    for vo in vo_list:
+        single_png = p_img_big.crop((vo.x, vo.y, vo.x + vo.w, vo.y + vo.h))
 
         new_img = Image.new('RGBA', (max_w, max_h), (0, 0, 0, 0))
 
@@ -132,9 +158,61 @@ def split_egret(p_json, p_png, p_out):
         png_name = vo.name
         if png_name.endswith('.png'):
             png_name = png_name[:-4]
-        out_path = Path(p_out).joinpath(out_name).joinpath(png_name + '.png')
+        out_path = Path(p_out).joinpath(p_out_name).joinpath(png_name + '.png')
         out_path.parent.mkdir(parents=True, exist_ok=True)
         new_img.save(out_path)
+        print(f'[INFO]保存成功：{str(out_path)}')
+
+
+def handle_center(p_vo_dict: dict[str, VoFrame], p_img_big: Image, p_out, p_out_name):
+    """
+    处理偏移类型为中心点的类型
+    :param p_vo_dict:
+    :param p_img_big:
+    :param p_out:
+    :param p_out_name:
+    :return:
+    """
+    max_left = 0
+    max_top = 0
+    max_right = 0
+    max_bottom = 0
+
+    vo_list = p_vo_dict.values()
+    for vo in vo_list:
+        left = -vo.offx
+        top = -vo.offy
+        right = vo.w - left
+        bottom = vo.h - top
+
+        if left > max_left:
+            max_left = left
+        if top > max_top:
+            max_top = top
+        if right > max_right:
+            max_right = right
+        if bottom > max_bottom:
+            max_bottom = bottom
+
+    max_w = max_left + max_right
+    max_h = max_top + max_bottom
+
+    for vo in vo_list:
+        single_png = p_img_big.crop((vo.x, vo.y, vo.x + vo.w, vo.y + vo.h))
+        new_img = Image.new('RGBA', (max_w, max_h), (0, 0, 0, 0))
+
+        paste_x = max_left + vo.offx
+        paste_y = max_top + vo.offy
+
+        new_img.paste(single_png, (paste_x, paste_y))
+
+        png_name = vo.name
+        if png_name.endswith('.png'):
+            png_name = png_name[:-4]
+        out_path = Path(p_out).joinpath(p_out_name).joinpath(png_name + '.png')
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        new_img.save(out_path)
+        print(f'[INFO]保存成功：{str(out_path)}')
 
 
 if __name__ == '__main__':
@@ -145,8 +223,9 @@ if __name__ == '__main__':
 
     app = sys.argv[0]
 
-    json_url = 'testres/qz_10002.json'
-    png_url = 'testres/qz_10002.png'
+    json_url = 'testres/role_10008.json'
+    png_url = 'testres/role_10008.png'
     out_url = 'testout'
+    offset_type = 0
 
-    split_egret(json_url, png_url, out_url)
+    split_egret(json_url, png_url, out_url, offset_type)
