@@ -44,14 +44,24 @@ def split_egret(p_json, p_png, p_out, p_offset_type=0):
     :param p_offset_type: 偏移值类型 0:左上角 1:中心点
     :return:
     """
+    path_png = Path(p_png)
+    if not path_png.exists():
+        print(f'[ERROR] png文件不存在：{str(path_png)}')
+        return 1
+
     # 打开png文件
-    img_big = Image.open(p_png)
+    try:
+        img_big = Image.open(p_png)
+    except Exception:
+        print(f'[ERROR] png文件读取错误：{str(path_png)}')
+        return 1
 
     # 打开json文件
     path_json = Path(p_json)
     out_name = path_json.stem  # 文件名
     if not path_json.exists():
-        sys.exit(f'[ERROR]文件不存在：{str(path_json)}')
+        print(f'[ERROR] json文件不存在：{str(path_json)}')
+        return 1
     obj_json = json.loads(path_json.read_text(encoding='utf-8'))
 
     # print(obj_json['mc'])
@@ -60,7 +70,8 @@ def split_egret(p_json, p_png, p_out, p_offset_type=0):
     # 遍历找到”frames“字段
     frames = find_frames(obj_json)
     if frames is None:
-        sys.exit(f'[ERROR]没有找到frames字段')
+        print(f'[ERROR] 没有找到frames字段')
+        return 2
 
     vo_dict = {}
     frame_index = 0
@@ -84,6 +95,7 @@ def split_egret(p_json, p_png, p_out, p_offset_type=0):
         handle_lett_top(vo_dict, img_big, p_out, out_name)
     elif p_offset_type == 1:
         handle_center(vo_dict, img_big, p_out, out_name)
+    return 0
 
 
 def handle_lett_top(p_vo_dict: dict, p_img_big: Image, p_out, p_out_name):
@@ -102,7 +114,7 @@ def handle_lett_top(p_vo_dict: dict, p_img_big: Image, p_out, p_out_name):
     min_cut_top = 0  # 记录最小裁剪上边距
 
     vo_list = p_vo_dict.values()
-    print(vo_list)
+    # print(vo_list)
     for vo in vo_list:
         # 计算新图像的宽高
         new_w = 0
@@ -161,7 +173,7 @@ def handle_lett_top(p_vo_dict: dict, p_img_big: Image, p_out, p_out_name):
         out_path = Path(p_out).joinpath(p_out_name).joinpath(png_name + '.png')
         out_path.parent.mkdir(parents=True, exist_ok=True)
         new_img.save(out_path)
-        print(f'[INFO]保存成功：{str(out_path)}')
+        print(f'[INFO] 保存成功：{str(out_path)}')
 
 
 def handle_center(p_vo_dict: dict[str, VoFrame], p_img_big: Image, p_out, p_out_name):
@@ -217,15 +229,58 @@ def handle_center(p_vo_dict: dict[str, VoFrame], p_img_big: Image, p_out, p_out_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='帮助信息')
-    parser.add_argument('--input', type=str, default='', help='输入文件路径')
+    parser.add_argument('--target', type=str, default='', help='输入目标文件/文件夹路径')
     parser.add_argument('--output', type=str, default='', help='输出文件路径')
+    parser.add_argument('--offset_type', type=int, default=0, help='偏移值类型 0:左上角 1:中心点')
+    parser.add_argument('--debug', type=int, default=0, help='是否开启调试模式')
     args = parser.parse_args()
 
     app = sys.argv[0]
 
-    json_url = 'testres/role_10008.json'
-    png_url = 'testres/role_10008.png'
-    out_url = 'testout'
-    offset_type = 0
+    json_url = ''
+    png_url = ''
 
-    split_egret(json_url, png_url, out_url, offset_type)
+    debug = args.debug
+    if debug:
+        json_url = 'testres/weapon_1_skill_01_ani.json'
+        png_url = 'testres/weapon_1_skill_01_ani.png'
+        out_url = 'testout'
+        # 偏移值类型 0:左上角 1:中心点
+        offset_type = 1
+        split_egret(json_url, png_url, out_url, offset_type)
+    else:
+        args.target = 'E:/work_ximi_sg/qdreamplay/sanguoclient/resource/model/role'
+        args.output = 'E:/work_test/sggc/meishu/model'
+        if not args.target:
+            print('[ERROR]请指定输入文件/文件夹路径')
+            sys.exit()
+        path_target = Path(args.target)
+        if not path_target.exists():
+            print('[ERROR]输入文件/文件夹不存在')
+            sys.exit()
+        if not args.output:
+            print('[ERROR]请指定输出文件路径')
+            sys.exit()
+        if path_target.is_dir():
+            # 指定的是文件夹
+            # 遍历文件夹
+            file_list = path_target.rglob('*.json')
+            for file_json in file_list:
+                file_png = file_json.parent.joinpath(file_json.stem + '.png')
+                if file_png.exists():
+                    split_egret(str(file_json), str(file_png), args.output, args.offset_type)
+        elif path_target.is_file():
+            # 指定的是文件
+            if path_target.suffix == '.json':
+                # 指定的是json文件
+                json_url = str(path_target)
+                png_url = str(path_target.parent.joinpath(path_target.stem + '.png'))
+            elif path_target.suffix == '.png':
+                # 指定的是png文件
+                png_url = str(path_target)
+                json_url = str(path_target.parent.joinpath(path_target.stem + '.json'))
+            else:
+                print('[ERROR]输入文件不是json或png文件')
+                sys.exit()
+
+            split_egret(json_url, png_url, args.output, args.offset_type)
